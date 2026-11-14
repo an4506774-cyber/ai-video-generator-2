@@ -4,93 +4,100 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>AI Video Generator</title>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #0f172a; color: white; padding: 20px; margin: 0; min-height: 100vh; display: flex; flex-direction: column; align-items: center; }
+        .container { max-width: 500px; width: 100%; text-align: center; }
+        h1 { font-size: 24px; margin-bottom: 20px; background: linear-gradient(90deg, #8b5cf6, #ec4899); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+        
+        .card { background: #1e293b; border-radius: 12px; padding: 20px; margin-bottom: 15px; border: 1px solid #334155; }
+        
+        input[type="file"] { display: none; }
+        .upload-btn { display: block; width: 100%; padding: 12px; background: #334155; border-radius: 8px; cursor: pointer; margin-bottom: 10px; transition: 0.2s; }
+        .upload-btn:hover { background: #475569; }
+        .upload-btn.has-file { background: #10b981; color: white; }
+        
+        input[type="password"] { width: 100%; padding: 12px; background: #0f172a; border: 1px solid #334155; border-radius: 8px; color: white; box-sizing: border-box; margin-bottom: 10px; }
+        
+        button.gen-btn { width: 100%; padding: 14px; background: linear-gradient(90deg, #8b5cf6, #ec4899); border: none; border-radius: 8px; color: white; font-weight: bold; font-size: 16px; cursor: pointer; margin-top: 10px; }
+        button.gen-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+        
+        #status { margin-top: 15px; font-size: 14px; min-height: 20px; }
+        video { width: 100%; border-radius: 8px; margin-top: 15px; background: black; display: none; }
+        .download-link { display: inline-block; margin-top: 10px; padding: 10px 20px; background: #10b981; color: white; text-decoration: none; border-radius: 6px; font-size: 14px; }
+    </style>
 </head>
-<body style="font-family: Arial; background: #0f172a; color: white; padding: 20px;">
-    <h1>✨ AI Video Generator</h1>
-    
-    <div style="margin: 20px 0;">
-        <label style="display: block; margin-bottom: 5px;">📷 Выбери фото:</label>
-        <input type="file" id="fileInput" accept="image/*" style="padding: 8px; background: #1e293b; color: white; border: 1px solid #334155; border-radius: 6px;">
-    </div>
-    
-    <div style="margin: 20px 0;">
-        <label style="display: block; margin-bottom: 5px;">🔑 Hugging Face Token:</label>
-        <input type="password" id="apiKey" placeholder="Вставь токен (hf_...)" style="width: 100%; max-width: 400px; padding: 10px; background: #1e293b; color: white; border: 1px solid #334155; border-radius: 6px;">
-        <small style="color: #94a3b8; display: block; margin-top: 5px;">Токен сохранится автоматически</small>
-    </div>
+<body>
+    <div class="container">
+        <h1>✨ AI Video Generator</h1>
+        
+        <div class="card">
+            <label class="upload-btn" id="uploadLabel">
+                📷 Выбери фото
+                <input type="file" id="fileInput" accept="image/*">
+            </label>
+            
+            <input type="password" id="apiKey" placeholder="Вставь токен Hugging Face (hf_...)">
+            <div style="font-size: 12px; color: #94a3b8; margin-bottom: 10px; text-align: left;">Токен сохранится автоматически</div>
+            
+            <button class="gen-btn" id="genBtn" onclick="generate()">🎬 Сгенерировать видео</button>
+        </div>
 
-    <div style="margin: 20px 0;">
-        <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
-            <input type="checkbox" id="useProxy" checked style="width: 18px; height: 18px;">
-            <span>Использовать CORS-прокси (рекомендуется)</span>
-        </label>
-        <small style="color: #94a3b8; display: block; margin-top: 5px;">Если не работает без галочки — включи её</small>
+        <div id="status"></div>
+        <video id="video" controls playsinline loop></video>
+        <a id="downloadLink" class="download-link" style="display:none">💾 Скачать видео</a>
     </div>
-    
-    <button onclick="generate()" style="padding: 12px 30px; background: linear-gradient(135deg, #8b5cf6, #ec4899); color: white; border: none; border-radius: 8px; cursor: pointer; font-size: 16px; font-weight: bold; margin: 10px 0;">🎬 Сгенерировать видео</button>
-    
-    <div id="status" style="margin: 20px 0; padding: 10px; border-radius: 6px;"></div>
-    
-    <video id="video" controls style="max-width: 100%; display: none; border-radius: 8px; margin-top: 20px;"></video>
-    
-    <a id="downloadLink" style="display: none; margin-top: 10px; padding: 10px 20px; background: #10b981; color: white; text-decoration: none; border-radius: 6px;">💾 Скачать видео</a>
 
     <script>
+        // Загрузка сохраненного токена
         const savedToken = localStorage.getItem('hf_token');
         if (savedToken) document.getElementById('apiKey').value = savedToken;
 
+        const fileInput = document.getElementById('fileInput');
+        const uploadLabel = document.getElementById('uploadLabel');
+        let selectedFile = null;
+
+        fileInput.addEventListener('change', (e) => {
+            if (e.target.files[0]) {
+                selectedFile = e.target.files[0];
+                uploadLabel.textContent = `✅ ${selectedFile.name}`;
+                uploadLabel.classList.add('has-file');
+            }
+        });
+
         async function generate() {
-            const file = document.getElementById('fileInput').files[0];
             const apiKey = document.getElementById('apiKey').value.trim();
-            const useProxy = document.getElementById('useProxy').checked;
             const status = document.getElementById('status');
             const video = document.getElementById('video');
             const downloadLink = document.getElementById('downloadLink');
+            const btn = document.getElementById('genBtn');
 
+            // Сохраняем токен
             if (apiKey) localStorage.setItem('hf_token', apiKey);
 
-            if (!file) {
-                status.innerHTML = '❌ Сначала выбери фото';
-                status.style.background = 'rgba(239, 68, 68, 0.2)';
-                return;
-            }
-            if (!apiKey) {
-                status.innerHTML = '❌ Введи Hugging Face токен';
-                status.style.background = 'rgba(239, 68, 68, 0.2)';
-                return;
-            }
+            if (!selectedFile) return alert('Выбери фото!');
+            if (!apiKey) return alert('Введи токен!');
 
-            status.innerHTML = '⏳ Генерация... Это может занять 30-60 секунд';
-            status.style.background = 'rgba(139, 92, 246, 0.2)';
+            btn.disabled = true;
+            status.textContent = '⏳ Генерация... (может занять до 60 сек)';
+            status.style.color = '#c4b5fd';
             video.style.display = 'none';
             downloadLink.style.display = 'none';
 
             try {
                 const formData = new FormData();
-                formData.append('inputs', file);
+                formData.append('inputs', selectedFile);
 
-                // Базовый URL модели
-                let targetUrl = 'https://api-inference.huggingface.co/models/stabilityai/stable-video-diffusion-img2vid';
-                
-                // Если включён прокси — оборачиваем URL
-                if (useProxy) {
-                    targetUrl = 'https://corsproxy.io/?' + encodeURIComponent(targetUrl);
-                }
-
-                const response = await fetch(targetUrl, {
+                // Используем модель i2vgen-xl (не требует согласия)
+                const response = await fetch('https://api-inference.huggingface.co/models/ali-vilab/i2vgen-xl', {
                     method: 'POST',
-                    headers: { 
-                        'Authorization': 'Bearer ' + apiKey 
-                    },
+                    headers: { 'Authorization': `Bearer ${apiKey}` },
                     body: formData
                 });
 
-                if (response.status === 503) {
-                    throw new Error('Модель загружается. Подожди 30 секунд и попробуй снова!');
-                }
-                
                 if (!response.ok) {
-                    throw new Error('Ошибка API: ' + response.status);
+                    if (response.status === 503) throw new Error('Модель загружается. Подожди 30с и повтори.');
+                    if (response.status === 401) throw new Error('Неверный токен.');
+                    throw new Error(`Ошибка API: ${response.status}`);
                 }
 
                 const blob = await response.blob();
@@ -98,17 +105,18 @@
                 
                 video.src = url;
                 video.style.display = 'block';
-                
                 downloadLink.href = url;
-                downloadLink.download = 'ai-video-' + Date.now() + '.mp4';
+                downloadLink.download = `video-${Date.now()}.mp4`;
                 downloadLink.style.display = 'inline-block';
                 
-                status.innerHTML = '✅ Видео готово!';
-                status.style.background = 'rgba(16, 185, 129, 0.2)';
+                status.textContent = '✅ Готово!';
+                status.style.color = '#6ee7b7';
 
-            } catch (error) {
-                status.innerHTML = '❌ ' + error.message;
-                status.style.background = 'rgba(239, 68, 68, 0.2)';
+            } catch (err) {
+                status.textContent = `❌ ${err.message}`;
+                status.style.color = '#fca5a5';
+            } finally {
+                btn.disabled = false;
             }
         }
     </script>
