@@ -6,40 +6,61 @@
     <title>AI Video Generator</title>
 </head>
 <body style="font-family: Arial; background: #0f172a; color: white; padding: 20px;">
-    <h1>AI Video Generator</h1>
-    <p>Загрузка...</p>
+    <h1>✨ AI Video Generator</h1>
     
-    <input type="file" id="fileInput" accept="image/*" style="margin: 10px 0;">
-    <br>
-    <input type="password" id="apiKey" placeholder="Hugging Face Token" style="width: 300px; padding: 8px; margin: 10px 0;">
-    <br>
-    <button onclick="generate()" style="padding: 12px 24px; background: #8b5cf6; color: white; border: none; border-radius: 6px; cursor: pointer; margin: 10px 0;">Генерировать</button>
+    <div style="margin: 20px 0;">
+        <label style="display: block; margin-bottom: 5px;">📷 Выбери фото:</label>
+        <input type="file" id="fileInput" accept="image/*" style="padding: 8px; background: #1e293b; color: white; border: 1px solid #334155; border-radius: 6px;">
+    </div>
     
-    <div id="status" style="margin: 15px 0;"></div>
-    <video id="video" controls style="max-width: 100%; display: none;"></video>
+    <div style="margin: 20px 0;">
+        <label style="display: block; margin-bottom: 5px;">🔑 Hugging Face Token:</label>
+        <input type="password" id="apiKey" placeholder="Вставь токен (hf_...)" style="width: 100%; max-width: 400px; padding: 10px; background: #1e293b; color: white; border: 1px solid #334155; border-radius: 6px;">
+        <small style="color: #94a3b8; display: block; margin-top: 5px;">Токен сохранится автоматически</small>
+    </div>
+    
+    <button onclick="generate()" style="padding: 12px 30px; background: linear-gradient(135deg, #8b5cf6, #ec4899); color: white; border: none; border-radius: 8px; cursor: pointer; font-size: 16px; font-weight: bold; margin: 10px 0;">🎬 Сгенерировать видео</button>
+    
+    <div id="status" style="margin: 20px 0; padding: 10px; border-radius: 6px;"></div>
+    
+    <video id="video" controls style="max-width: 100%; display: none; border-radius: 8px; margin-top: 20px;"></video>
+    
+    <a id="downloadLink" style="display: none; margin-top: 10px; padding: 10px 20px; background: #10b981; color: white; text-decoration: none; border-radius: 6px; display: inline-block;">💾 Скачать видео</a>
 
     <script>
-        console.log('Скрипт загружен');
-        
+        // Загружаем сохранённый токен при старте
+        const savedToken = localStorage.getItem('hf_token');
+        if (savedToken) {
+            document.getElementById('apiKey').value = savedToken;
+        }
+
         async function generate() {
             const file = document.getElementById('fileInput').files[0];
             const apiKey = document.getElementById('apiKey').value.trim();
             const status = document.getElementById('status');
             const video = document.getElementById('video');
+            const downloadLink = document.getElementById('downloadLink');
 
-            console.log('Начинаем генерацию');
+            // Сохраняем токен
+            if (apiKey) {
+                localStorage.setItem('hf_token', apiKey);
+            }
 
             if (!file) {
-                status.innerHTML = 'Выбери фото';
+                status.innerHTML = '❌ Сначала выбери фото';
+                status.style.background = 'rgba(239, 68, 68, 0.2)';
                 return;
             }
             if (!apiKey) {
-                status.innerHTML = 'Введи токен';
+                status.innerHTML = '❌ Введи Hugging Face токен';
+                status.style.background = 'rgba(239, 68, 68, 0.2)';
                 return;
             }
 
-            status.innerHTML = 'Генерация...';
+            status.innerHTML = '⏳ Генерация... Это может занять 30-60 секунд';
+            status.style.background = 'rgba(139, 92, 246, 0.2)';
             video.style.display = 'none';
+            downloadLink.style.display = 'none';
 
             try {
                 const formData = new FormData();
@@ -49,26 +70,37 @@
                     'https://api-inference.huggingface.co/models/stabilityai/stable-video-diffusion-img2vid',
                     {
                         method: 'POST',
-                        headers: { 'Authorization': 'Bearer ' + apiKey },
+                        headers: { 
+                            'Authorization': 'Bearer ' + apiKey 
+                        },
                         body: formData
                     }
                 );
 
-                console.log('Статус ответа:', response.status);
-
+                if (response.status === 503) {
+                    throw new Error('Модель загружается. Подожди 30 секунд и попробуй снова!');
+                }
+                
                 if (!response.ok) {
-                    throw new Error('Ошибка: ' + response.status);
+                    throw new Error('Ошибка API: ' + response.status);
                 }
 
                 const blob = await response.blob();
                 const url = URL.createObjectURL(blob);
+                
                 video.src = url;
                 video.style.display = 'block';
-                status.innerHTML = 'Готово!';
+                
+                downloadLink.href = url;
+                downloadLink.download = 'ai-video-' + Date.now() + '.mp4';
+                downloadLink.style.display = 'inline-block';
+                
+                status.innerHTML = '✅ Видео готово!';
+                status.style.background = 'rgba(16, 185, 129, 0.2)';
 
             } catch (error) {
-                console.error(error);
-                status.innerHTML = 'Ошибка: ' + error.message;
+                status.innerHTML = '❌ ' + error.message;
+                status.style.background = 'rgba(239, 68, 68, 0.2)';
             }
         }
     </script>
