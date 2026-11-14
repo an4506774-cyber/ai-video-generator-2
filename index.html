@@ -21,7 +21,7 @@
         button.gen-btn { width: 100%; padding: 14px; background: linear-gradient(90deg, #8b5cf6, #ec4899); border: none; border-radius: 8px; color: white; font-weight: bold; font-size: 16px; cursor: pointer; margin-top: 10px; }
         button.gen-btn:disabled { opacity: 0.5; cursor: not-allowed; }
         
-        #status { margin-top: 15px; font-size: 14px; min-height: 20px; word-wrap: break-word; }
+        #status { margin-top: 15px; font-size: 14px; min-height: 20px; word-wrap: break-word; line-height: 1.4; }
         video { width: 100%; border-radius: 8px; margin-top: 15px; background: black; display: none; }
         .download-link { display: inline-block; margin-top: 10px; padding: 10px 20px; background: #10b981; color: white; text-decoration: none; border-radius: 6px; font-size: 14px; }
         
@@ -44,7 +44,7 @@
             
             <div class="proxy-check">
                 <input type="checkbox" id="useProxy" checked>
-                <label for="useProxy">Использовать CORS-прокси (рекомендуется)</label>
+                <label for="useProxy">Использовать CORS-прокси (обязательно)</label>
             </div>
             
             <button class="gen-btn" id="genBtn" onclick="generate()">🎬 Сгенерировать видео</button>
@@ -79,9 +79,15 @@
             const downloadLink = document.getElementById('downloadLink');
             const btn = document.getElementById('genBtn');
 
+            // Проверка токена
+            if (!apiKey.startsWith('hf_')) {
+                status.textContent = '❌ Токен должен начинаться с "hf_"';
+                status.style.color = '#fca5a5';
+                return;
+            }
+
             if (apiKey) localStorage.setItem('hf_token', apiKey);
             if (!selectedFile) return alert('Выбери фото!');
-            if (!apiKey) return alert('Введи токен!');
 
             btn.disabled = true;
             status.textContent = '⏳ Генерация... (может занять до 60 сек)';
@@ -93,10 +99,9 @@
                 const formData = new FormData();
                 formData.append('inputs', selectedFile);
 
-                // Базовый URL модели
-                let targetUrl = 'https://api-inference.huggingface.co/models/ali-vilab/i2vgen-xl';
+                // Используем гарантированно открытую модель
+                let targetUrl = 'https://api-inference.huggingface.co/models/damo-vilab/text-to-video-ms-1.7b';
                 
-                // Если включен прокси - оборачиваем URL
                 if (useProxy) {
                     targetUrl = 'https://corsproxy.io/?' + encodeURIComponent(targetUrl);
                 }
@@ -109,8 +114,8 @@
 
                 if (!response.ok) {
                     if (response.status === 503) throw new Error('Модель загружается. Подожди 30с и повтори.');
-                    if (response.status === 401) throw new Error('Неверный токен.');
-                    if (response.status === 403) throw new Error('Доступ запрещен. Проверь токен или модель.');
+                    if (response.status === 401) throw new Error('Неверный токен. Создай новый типа Read.');
+                    if (response.status === 403) throw new Error('Доступ запрещен. Убедись, что email подтвержден.');
                     throw new Error(`Ошибка API: ${response.status}`);
                 }
 
